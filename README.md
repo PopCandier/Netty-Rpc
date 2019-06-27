@@ -425,3 +425,82 @@ protected MultithreadEventExecutorGroup(int nThreads, Executor executor,
 ```
 
 关键3的用处主要是对线程池的线程进行轮询，并且如果当前线程数是幂等的话，就会采取二进制算法会移动children数组的下标，否则就会按照普通的取模算法。
+
+所以，对于MultithreadEventExecutorGroup中的处理逻辑，简单做一个总结：
+
+* 创建一个大小为nThreads的SingleThreadEventExecutor数组
+* 根据nThread的大小，创建不同的Chooser，即如果nThreads是2的幂，则使用PowerOfTwoEventExecutorChooser，反之使用GenericEventExecutorChooser无论是使用哪个Chooser，他们的功能一样，只不过&运算与%运算性能更好一点，因为是二进制计算。总是他们都是从children数组中选择一个合适的EventExecutor实例
+* 调用newChild（）方法初始化一个children数组
+
+```java
+ protected EventLoop newChild(Executor executor, Object... args) throws Exception {
+        return new NioEventLoop(this, executor, (SelectorProvider)args[0], ((SelectStrategyFactory)args[1]).newSelectStrategy(), (RejectedExecutionHandler)args[2]);
+    }
+```
+
+其实这个newChild也就是一个实例化NioEventLoop对象
+
+然后我们来总结一下EventLoopGroup的初始化过程
+
+* 虽然是EventLoopGroup的调用，但是我们知道最后都会走到MultithreadEventExecutorGroup的构造方法，里面维护了一个类型为EventExecutor children数组，其大小是nThreads，就这样构成了一个线程池。意味着每一个线程都是一个EventExecutor
+
+* 实例化EventLoopGroup的时候，如果指定线程大小，nThreads就只指定值，否则就是CPU的核心数*2
+
+* MultitgreadEventExecutorGroup会调用newChild()抽象方法来实例化children数组
+
+* 抽象方法newChild是在NioEventLoop中实现的，它返回一个NioEventLoop实例
+
+* NioEventLoop属性赋值
+
+  * provider:在NioEventLoopGroup构造器中通过SelectorProvider.provider()获取的一个SelectorProvider
+  * selector:在NioEventLoop构造器中通过调用通过provider.openSelector（）方法获取的一个selector对象。
+
+##### Channel注册到Selector
+
+我们从
+
+```java
+ final ChannelFuture initAndRegister() {
+        Channel channel = null;
+
+        try {
+            channel = this.channelFactory.newChannel();
+            this.init(channel);
+        } catch (Throwable var3) {
+            if (channel != null) {
+                channel.unsafe().closeForcibly();
+            }
+
+            return (new DefaultChannelPromise(channel, GlobalEventExecutor.INSTANCE)).setFailure(var3);
+        }
+		//开始注册的地方
+        ChannelFuture regFuture = this.config().group().register(channel);
+        if (regFuture.cause() != null) {
+            if (channel.isRegistered()) {
+                channel.close();
+            } else {
+                channel.unsafe().closeForcibly();
+            }
+        }
+
+        return regFuture;
+    }
+```
+
+  Channel初始化后，会调用group().register()方法向selector注册Channel
+
+总的来说，Channel注册的过程所做的工作就是将Channel与对应的EventLoop关联
+
+(通过MultithreadEventLoopGroup的register中，调用next()方法获取一个可用的SingleThreadEventLoop，然后调用他的register方法)
+
+因此，这也体现了，Netty中，每一个Channel都会关联一个特定的EventLoop，并且继续调用底层的Java Nio的Nio的SocketChannel对象的register方法，并且将JavaNio的SocketChannel注册到指定的selector中去。通过这两步，Neety完成了Channel对EventLoop的关联。
+
+##### Handler的添加过程
+
+
+
+
+
+
+
+  ​		
