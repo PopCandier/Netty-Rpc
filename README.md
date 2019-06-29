@@ -509,7 +509,8 @@ protected MultithreadEventExecutorGroup(int nThreads, Executor executor,
 
 Netty中每个Channel都有且只有一个ChannelPipeline，这个我们已经见过了，AbstarctChannel都会有四个属性，id，parent，unsafe，pipeline
 
-![1561780484758](C:\Users\99405\AppData\Roaming\Typora\typora-user-images\1561780484758.png)
+
+![image](https://github.com/PopCandier/Netty-Rpc/blob/master/images/1561780484758.png)
 
 而ChannelPipeline中又维护了一个由ChannelHandlerContext组成的双向链表，头是HeadContext，尾巴是TailContext
 
@@ -622,7 +623,7 @@ final ChannelFuture initAndRegister() {
 
 我回到ChannelInitializer的话题，首先他是一个hander，但是我们从类图可以发现，他只是实现了ChannelInboundHandler接口
 
-![1561778610102](C:\Users\99405\AppData\Roaming\Typora\typora-user-images\1561778610102.png)
+![Channel](C:\Users\99405\AppData\Roaming\Typora\typora-user-images\1561778610102.png)
 
 那么意味着，一个ChannelInitializer的实例化，只是一个ChannelInboundHandler的实现
 
@@ -875,7 +876,7 @@ private void invokeConnect(SocketAddress remoteAddress, SocketAddress localAddre
 //最后呢，其实也就是回到了head，如果你没有实现自己的connect方法的话，会回到head节点上然后，调用unsafe的方法，建立连接。
 ```
 
-![1561783120397](C:\Users\99405\AppData\Roaming\Typora\typora-user-images\1561783120397.png)
+![outbound事件传播](https://github.com/PopCandier/Netty-Rpc/blob/master/images/1561783120397.png)
 
 如果你没有实现outbound中的connect方法，那么他就会一直传播下去，直到找到头节点，因为头结点也是head，也是一个outbound实现。
 
